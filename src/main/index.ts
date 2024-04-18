@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { join } from 'path';
 import {readFile } from 'fs/promises';
 
@@ -18,18 +18,6 @@ const createWindow = () => {
       join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    mainWindow.focus();
-    showOpenDialog(mainWindow);
-  })
-
-  mainWindow.webContents.openDevTools({
-    mode: 'detach',
-  });
-};
-
 app.on('ready', createWindow);
 
 app.on('window-all-closed', () => {
@@ -44,8 +32,9 @@ app.on('activate', () => {
   }
 });
 
-const openFile = async (filePath: string) => {
-    return await readFile(filePath, { encoding: 'utf-8' });
+const openFile = async ( browserWindow: BrowserWindow, filePath: string) => {
+    const contents =  await readFile(filePath, { encoding: 'utf-8' });
+    browserWindow.webContents.send('file-opened', contents, filePath);
 }
 const showOpenDialog = async (window: BrowserWindow ) => {
     const result = await dialog.showOpenDialog(window, {
@@ -54,6 +43,22 @@ const showOpenDialog = async (window: BrowserWindow ) => {
     })
     if (result.canceled) return;
     const [fp] = result.filePaths;
-    console.log(openFile(fp));
+    openFile(window, fp)
 }
+
+ipcMain.on('show-open-dialog', (evt) => {
+    const window = BrowserWindow.fromWebContents(evt.sender);
+    if (!window) return;
+    showOpenDialog(window);
+})
+
+mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    mainWindow.focus();
+})
+
+mainWindow.webContents.openDevTools({
+    mode: 'detach',
+});
+};
 
