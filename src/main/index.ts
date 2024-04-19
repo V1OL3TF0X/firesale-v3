@@ -11,6 +11,8 @@ let currentFiles: Map<BrowserWindow, MarkdownFile> = new Map();
 
 function setCurrentFile(window: BrowserWindow, newFile: MarkdownFile) {
     currentFiles.set(window, newFile);
+    window.setTitle(`${app.name} - ${parse(newFile.filePath).base}`)
+    window.setRepresentedFilename(newFile.filePath);
 }
 
 const createWindow = () => {
