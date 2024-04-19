@@ -25,6 +25,9 @@ const fns = {
   saveFile(content: string) {
     ipcRenderer.send("save-file", content);
   },
+  checkForChanges(content: string): Promise<boolean> {
+    return ipcRenderer.invoke("has-changes", content);
+  },
 } as const;
 
 export type ExtraFunctions = {
