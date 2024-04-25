@@ -13,8 +13,9 @@ function debounce<Args extends unknown[]>(
 }
 
 const debouncedUpdateSave = debounce(async (contents: string) => {
-  Elements.SaveMarkdownButton.disabled =
-    !(await window.api.checkForChanges(contents));
+  const shouldDisable = !(await window.api.checkForChanges(contents));
+  Elements.SaveMarkdownButton.disabled = shouldDisable;
+  Elements.RevertButton.disabled = shouldDisable;
 });
 
 Elements.MarkdownView.addEventListener("input", () => {
@@ -31,7 +32,15 @@ window.api.onFileOpened((c) => {
 
 window.api.onSaveFileError(console.error);
 window.api.onFileSaved((fp) => console.log(`File saved successfully to ${fp}`));
-
+Elements.RevertButton.addEventListener("click", async () => {
+  const buttons = [Elements.OpenFileButton, Elements.NewFileButton];
+  buttons.forEach((b) => (b.disabled = true));
+  Elements.SaveMarkdownButton.disabled = true;
+  const savedContent = await window.api.revertChanges();
+  Elements.MarkdownView.value = savedContent;
+  renderMarkdown(savedContent);
+  buttons.forEach((b) => (b.disabled = false));
+});
 Elements.OpenFileButton.addEventListener("click", window.api.showOpenDialog);
 Elements.SaveMarkdownButton.addEventListener("click", () =>
   window.api.saveFile(Elements.MarkdownView.value),

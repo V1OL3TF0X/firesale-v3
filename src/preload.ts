@@ -28,6 +28,9 @@ const fns = {
   checkForChanges(content: string): Promise<boolean> {
     return ipcRenderer.invoke("has-changes", content);
   },
+  revertChanges() {
+    return ipcRenderer.invoke("revert-changes");
+  },
 } as const;
 
 export type ExtraFunctions = {

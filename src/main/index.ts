@@ -10,16 +10,16 @@ type MarkdownFile = {
 let currentFiles: Map<BrowserWindow, MarkdownFile> = new Map();
 
 function setCurrentFile(window: BrowserWindow, newFile: MarkdownFile) {
-    currentFiles.set(window, newFile);
+  currentFiles.set(window, newFile);
 
-    app.addRecentDocument(newFile.filePath);
-    window.setTitle(`${app.name} - ${basename(newFile.filePath)}`)
-    window.setRepresentedFilename(newFile.filePath);
+  app.addRecentDocument(newFile.filePath);
+  window.setTitle(`${app.name} - ${basename(newFile.filePath)}`);
+  window.setRepresentedFilename(newFile.filePath);
 }
 
 const hasChanges = (window: BrowserWindow, contents: string) => {
-    return currentFiles.get(window)?.content !== contents;
-}
+  return currentFiles.get(window)?.content !== contents;
+};
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
@@ -142,11 +142,16 @@ ipcMain.on("save-file", (evt, contents) => {
   if (!window) return;
   saveCurrentFile(window, contents);
 });
+ipcMain.handle("revert-changes", (evt) => {
+  const window = BrowserWindow.fromWebContents(evt.sender);
+  if (!window) return;
+  return currentFiles.get(window)?.content;
+});
 
-ipcMain.handle('has-changes', (evt, contents) => {
+ipcMain.handle("has-changes", (evt, contents) => {
   const window = BrowserWindow.fromWebContents(evt.sender);
   if (!window) return false;
   const changed = hasChanges(window, contents);
   window.setDocumentEdited(changed);
   return changed;
-})
+});
