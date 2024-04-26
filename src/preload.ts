@@ -31,6 +31,15 @@ const fns = {
   revertChanges() {
     return ipcRenderer.invoke("revert-changes");
   },
+  showFile() {
+    ipcRenderer.send("open-in-folder");
+  },
+  openNewFile() {
+    ipcRenderer.send('open-new-file');
+  },
+  openInDefaultApp() {
+    ipcRenderer.send("open-in-default-app");
+  },
 } as const;
 
 export type ExtraFunctions = {

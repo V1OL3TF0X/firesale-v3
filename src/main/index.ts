@@ -1,19 +1,28 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { join, basename } from "path";
 import { readFile, writeFile } from "fs/promises";
 
 type MarkdownFile = {
   content: string;
-  filePath: string;
+  filePath?: string;
 };
 
 let currentFiles: Map<BrowserWindow, MarkdownFile> = new Map();
 
+function title(filename: string) {
+  return `${app.name} - ${filename}`;
+}
+
 function setCurrentFile(window: BrowserWindow, newFile: MarkdownFile) {
   currentFiles.set(window, newFile);
 
+  if (!newFile.filePath) {
+    window.setTitle(title("untitled.md"));
+    window.setRepresentedFilename('');
+    return;
+  }
   app.addRecentDocument(newFile.filePath);
-  window.setTitle(`${app.name} - ${basename(newFile.filePath)}`);
+  window.setTitle(title(basename(newFile.filePath)));
   window.setRepresentedFilename(newFile.filePath);
 }
 
@@ -116,7 +125,7 @@ const saveCurrentFile = async (window: BrowserWindow, contents: string) => {
     if (currentFile.content === contents) return;
     currentFile.content = contents;
   }
-  saveFile(window, currentFile.filePath, contents);
+  saveFile(window, currentFile.filePath!, contents);
 };
 
 ipcMain.on("show-save-dialog", async (evt, contents: string) => {
@@ -130,7 +139,11 @@ ipcMain.on("show-save-dialog", async (evt, contents: string) => {
   if (!filePath) return;
   saveFile(window, filePath, contents);
 });
-
+ipcMain.on("open-new-file", (evt) => {
+  const window = BrowserWindow.fromWebContents(evt.sender);
+  if (!window) return;
+  setCurrentFile(window, { content: "", filePath: undefined });
+});
 ipcMain.on("show-open-dialog", (evt) => {
   const window = BrowserWindow.fromWebContents(evt.sender);
   if (!window) return;
@@ -154,4 +167,24 @@ ipcMain.handle("has-changes", (evt, contents) => {
   const changed = hasChanges(window, contents);
   window.setDocumentEdited(changed);
   return changed;
+});
+
+ipcMain.on("open-in-default-app", (e) => {
+  const window = BrowserWindow.fromWebContents(e.sender);
+  if (!window) return;
+  const file = currentFiles.get(window);
+  if (!file?.filePath) {
+    window.webContents.send("has-file-path", false);
+  }
+  shell.openPath(file!.filePath!);
+});
+
+ipcMain.on("open-in-folder", (e) => {
+  const window = BrowserWindow.fromWebContents(e.sender);
+  if (!window) return;
+  const file = currentFiles.get(window);
+  if (!file?.filePath) {
+    window.webContents.send("has-file-path", false);
+  }
+  shell.showItemInFolder(file!.filePath!);
 });
