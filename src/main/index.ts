@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell, Menu, MenuItemConstructorOptions } from "electron";
 import { join, basename } from "path";
 import { readFile, writeFile } from "fs/promises";
 
@@ -27,7 +27,9 @@ function setCurrentFile(window: BrowserWindow, newFile: MarkdownFile) {
 }
 
 const hasChanges = (window: BrowserWindow, contents: string) => {
-  return currentFiles.get(window)?.content !== contents;
+  const file = currentFiles.get(window);
+    if(!file) return !!contents;
+    return file.content !== contents;
 };
 
 const createWindow = () => {
@@ -54,6 +56,7 @@ const createWindow = () => {
     mode: "detach",
   });
   mainWindow.on("closed", () => currentFiles.delete(mainWindow));
+    return mainWindow;
 };
 app.on("ready", createWindow);
 
@@ -110,22 +113,22 @@ const showSaveDialog = async (
   return result.filePath;
 };
 
-const saveCurrentFile = async (window: BrowserWindow, contents: string) => {
+const saveCurrentFile = async (window: BrowserWindow, contents: string, forceDialog = false) => {
   let currentFile = currentFiles.get(window);
-  if (!currentFile) {
+  if (!currentFile || forceDialog) {
     const filePath = await showSaveDialog(window, {
       title: "Save markdown to file",
-      defaultPath: "untitled.md",
+      defaultPath: currentFile?.filePath ?? "untitled.md",
       filters: [{ name: "Markdown File", extensions: ["md"] }],
     });
     if (!filePath) return;
-    currentFile = { filePath, content: contents };
+        currentFile = { filePath, content: contents};
     setCurrentFile(window, currentFile);
   } else {
     if (currentFile.content === contents) return;
     currentFile.content = contents;
   }
-  saveFile(window, currentFile.filePath!, contents);
+  saveFile(window, currentFile.filePath!, currentFile.content);
 };
 
 ipcMain.on("show-save-dialog", async (evt, contents: string) => {
@@ -150,10 +153,10 @@ ipcMain.on("show-open-dialog", (evt) => {
   showOpenDialog(window);
 });
 
-ipcMain.on("save-file", (evt, contents) => {
+ipcMain.on("save-file", (evt, contents, force) => {
   const window = BrowserWindow.fromWebContents(evt.sender);
   if (!window) return;
-  saveCurrentFile(window, contents);
+  saveCurrentFile(window, contents, force);
 });
 ipcMain.handle("revert-changes", (evt) => {
   const window = BrowserWindow.fromWebContents(evt.sender);
@@ -166,6 +169,9 @@ ipcMain.handle("has-changes", (evt, contents) => {
   if (!window) return false;
   const changed = hasChanges(window, contents);
   window.setDocumentEdited(changed);
+  const menu = Menu.getApplicationMenu()!;
+  menu.getMenuItemById('save')!.enabled = changed;
+  menu.getMenuItemById('save-as')!.enabled = changed;
   return changed;
 });
 
@@ -188,3 +194,52 @@ ipcMain.on("open-in-folder", (e) => {
   }
   shell.showItemInFolder(file!.filePath!);
 });
+
+const template: MenuItemConstructorOptions[] = [
+    {
+        label: 'File',
+        submenu: [
+            {
+                label: 'Open',
+                click() {
+                    const currentWindow = BrowserWindow.getFocusedWindow() ?? createWindow();
+                    showOpenDialog(currentWindow);
+                },
+                accelerator: 'CmdOrCtrl + O',
+            },
+            {
+                label: 'Save',
+                id: 'save',
+                click() {
+                    (BrowserWindow.getFocusedWindow() ?? createWindow())
+                        .webContents
+                        .send('save-to-file', false);
+                },
+                accelerator: 'CmdOrCtrl + S',
+            },
+            {
+                id: 'save-as',
+                label: 'Save As',
+                click() {
+                    (BrowserWindow.getFocusedWindow() ?? createWindow())
+                        .webContents
+                        .send('save-to-file', true);
+                },
+                accelerator: 'CmdOrCtrl + Shift + S',
+            },
+        ],
+    },
+    {
+        label: 'Edit',
+        role: 'editMenu',
+    },
+];
+
+if (process.platform === 'darwin') {
+    template.unshift({
+        label: app.name,
+        role: 'appMenu',
+    });
+}
+const menu = Menu.buildFromTemplate(template);
+Menu.setApplicationMenu(menu);

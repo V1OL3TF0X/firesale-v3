@@ -28,7 +28,6 @@ const debouncedUpdateSave = debounce(async (contents: string) => {
   Elements.RevertButton.disabled = shouldDisable;
 });
 
-
 Elements.MarkdownView.addEventListener("input", () => {
   const markdown = Elements.MarkdownView.value;
   debouncedUpdateSave(markdown);
@@ -40,6 +39,8 @@ window.api.onFileOpened((c) => {
   Elements.SaveMarkdownButton.disabled = true;
   changeLacksFilePath(false);
 });
+
+window.api.onSaveToFile(() => Elements.MarkdownView.value);
 
 window.api.onSaveFileError(console.error);
 window.api.onFileSaved((fp) => {

@@ -19,6 +19,9 @@ const fns = {
   showOpenDialog() {
     ipcRenderer.send("show-open-dialog");
   },
+  onSaveToFile(getContents: () => string) {
+    ipcRenderer.on('save-to-file', (_, forceDialog: boolean) => ipcRenderer.send('show-save-dialog', getContents(), forceDialog));
+  },
   showSaveDialog(contents: string) {
     ipcRenderer.send("show-save-dialog", contents);
   },
@@ -42,8 +45,6 @@ const fns = {
   },
 } as const;
 
-export type ExtraFunctions = {
-  [K in typeof key]: typeof fns;
-};
+export type Api = typeof fns;
 
 contextBridge.exposeInMainWorld(key, fns);
